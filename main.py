@@ -6,6 +6,7 @@ import os
 import torch
 import numpy as np
 import json
+import argparse
 
 from config import MODEL_CONFIG, TRAINING_CONFIG, DATA_CONFIG, PATHS, LOSS_CONFIG
 from model import DeepSurv
@@ -17,6 +18,28 @@ from evaluation import evaluate_model, plot_training_curves, plot_risk_distribut
 # ============================================================================
 # Utility Functions
 # ============================================================================
+
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description='Train DeepSurv model')
+    
+    # Data arguments
+    parser.add_argument('--data', type=str, default=None,
+                        help='Path to CSV data file (if not provided, synthetic data is used)')
+    parser.add_argument('--data-type', type=str, default='linear',
+                        choices=['linear', 'gaussian', 'treatment'],
+                        help='Type of synthetic data to generate')
+    parser.add_argument('--n-samples', type=int, default=5000,
+                        help='Number of samples for synthetic data')
+    parser.add_argument('--n-features', type=int, default=10,
+                        help='Number of features for synthetic data')
+    
+    # Device argument
+    parser.add_argument('--cpu', action='store_true',
+                        help='Force CPU usage even if CUDA is available')
+    
+    return parser.parse_args()
+
 
 def set_seed(seed: int):
     """Set random seeds for reproducibility."""
@@ -33,6 +56,9 @@ def set_seed(seed: int):
 def main():
     """Main training pipeline - load data, create model, train, evaluate."""
     
+    # Parse command-line arguments
+    args = parse_args()
+    
     # ------------------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------------------
@@ -42,8 +68,21 @@ def main():
     for path in PATHS.values():
         os.makedirs(path, exist_ok=True)
     
-    device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
+    # Select device: MPS (Apple Silicon GPU) > CUDA > CPU
+    if args.cpu:
+        device = 'cpu'
+    elif torch.cuda.is_available():
+        device = 'cuda'
+    elif torch.backends.mps.is_available():
+        device = 'mps'
+    else:
+        device = 'cpu'
+    
     print(f"Using device: {device}")
+    if device == 'mps':
+        print("🚀 Using Apple Silicon GPU (MPS) for acceleration!")
+    elif device == 'cuda':
+        print("🚀 Using NVIDIA GPU (CUDA) for acceleration!")
     
     print("\n" + "="*50)
     print("Loading data...")
@@ -113,6 +152,7 @@ def main():
         early_stopping_patience=TRAINING_CONFIG['early_stopping_patience'],
         save_path=os.path.join(PATHS['model_dir'], 'best_model.pt'),
         verbose=True
+    )
     
     # ------------------------------------------------------------------------
     # Save and Visualize Results
