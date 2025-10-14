@@ -1,76 +1,72 @@
 """
-Training utilities for DeepSurv.
+Training utilities for DeepSurv
 """
 
 import torch
 import torch.optim as optim
 import numpy as np
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 import os
 from tqdm import tqdm
 
-from model import DeepSurv
 from loss import CoxPHLoss
 from evaluation import concordance_index
 
 
-# ============================================================================
-# Trainer Class
-# ============================================================================
-
 class Trainer:
     """
-    Trainer class for DeepSurv.
+    Trainer for vanilla DeepSurv with SGD + Nesterov momentum.
     
     Args:
         model: DeepSurv model
-        device: Device ('cpu' or 'cuda')
-        learning_rate: Learning rate
-        l2_reg: L2 regularization
-        optimizer_name: Optimizer ('adam' or 'sgd')
-        loss_method: Loss method ('breslow' or 'efron')
+        device: Device ('cpu', 'cuda', or 'mps')
+        learning_rate: Initial learning rate
+        lr_decay: Learning rate power decay coefficient
+        momentum: Momentum coefficient (for SGD)
+        optimizer_name: 'sgd' or 'adam'
+        l2_reg: L2 regularization (weight decay)
+        loss_method: 'efron' or 'breslow'
     """
     
     def __init__(
         self,
-        model: DeepSurv,
+        model,
         device: str = 'cpu',
-        learning_rate: float = 0.001,
-        l2_reg: float = 0.001,
-        optimizer_name: str = 'adam',
+        learning_rate: float = 1e-4,
+        lr_decay: float = 0.001,
+        momentum: float = 0.9,
+        optimizer_name: str = 'sgd',
+        l2_reg: float = 10.0,
+        l1_reg: float = 0.0,
         loss_method: str = 'efron'
     ):
         self.model = model.to(device)
         self.device = device
-        self.l2_reg = l2_reg
+        self.initial_lr = learning_rate
+        self.lr_decay = lr_decay
         
-        # --------------------------------------------------------------------
-        # Loss
-        # --------------------------------------------------------------------
+        # Loss function
         self.criterion = CoxPHLoss(method=loss_method)
         
-        # --------------------------------------------------------------------
-        # Optimizer
-        # --------------------------------------------------------------------
-        if optimizer_name == 'adam':
+        # Optimizer (vanilla uses SGD with Nesterov momentum)
+        if optimizer_name == 'sgd':
+            self.optimizer = optim.SGD(
+                model.parameters(),
+                lr=learning_rate,
+                momentum=momentum,
+                nesterov=True,
+                weight_decay=l2_reg
+            )
+        elif optimizer_name == 'adam':
             self.optimizer = optim.Adam(
                 model.parameters(),
                 lr=learning_rate,
                 weight_decay=l2_reg
             )
-        elif optimizer_name == 'sgd':
-            self.optimizer = optim.SGD(
-                model.parameters(),
-                lr=learning_rate,
-                momentum=0.9,
-                weight_decay=l2_reg
-            )
         else:
             raise ValueError(f"Unknown optimizer: {optimizer_name}")
         
-        # --------------------------------------------------------------------
-        # History
-        # --------------------------------------------------------------------
+        # Training history
         self.history = {
             'train_loss': [],
             'val_loss': [],
@@ -78,18 +74,13 @@ class Trainer:
             'val_ci': []
         }
     
-    # ------------------------------------------------------------------------
-    # Training Loop
-    # ------------------------------------------------------------------------
-    
     def train_epoch(self, train_loader) -> Tuple[float, float]:
-        """Train model for one epoch and return average loss and C-index."""
+        """Train for one epoch."""
         self.model.train()
         total_loss = 0.0
         all_risks, all_times, all_events = [], [], []
         
         for features, times, events in train_loader:
-            # Move to device
             features = features.to(self.device)
             times = times.to(self.device)
             events = events.to(self.device)
@@ -98,12 +89,12 @@ class Trainer:
             risk_scores = self.model(features).squeeze()
             loss = self.criterion(risk_scores, times, events)
             
-            # Backward
+            # Backward pass
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
             
-            # Collect predictions for C-index
+            # Collect for metrics
             total_loss += loss.item() * len(features)
             all_risks.append(risk_scores.detach().cpu().numpy())
             all_times.append(times.cpu().numpy())
@@ -118,20 +109,14 @@ class Trainer:
         
         return avg_loss, ci
     
-    # ------------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------------
-    
     def validate(self, val_loader) -> Tuple[float, float]:
-        """Evaluate model on validation set."""
+        """Validate on validation set."""
         self.model.eval()
         total_loss = 0.0
         all_risks, all_times, all_events = [], [], []
-        all_events = []
         
         with torch.no_grad():
             for features, times, events in val_loader:
-                # Move to device
                 features = features.to(self.device)
                 times = times.to(self.device)
                 events = events.to(self.device)
@@ -140,7 +125,7 @@ class Trainer:
                 risk_scores = self.model(features).squeeze()
                 loss = self.criterion(risk_scores, times, events)
                 
-                # Collect predictions
+                # Collect for metrics
                 total_loss += loss.item() * len(features)
                 all_risks.append(risk_scores.cpu().numpy())
                 all_times.append(times.cpu().numpy())
@@ -155,40 +140,41 @@ class Trainer:
         
         return avg_loss, ci
     
-    # ------------------------------------------------------------------------
-    # Full Training Pipeline
-    # ------------------------------------------------------------------------
-    
     def fit(
         self,
         train_loader,
         val_loader,
-        num_epochs: int = 100,
-        early_stopping_patience: int = 10,
-        save_path: Optional[str] = None,
+        num_epochs: int = 500,
+        early_stopping_patience: int = 50,
+        save_path: str = None,
         verbose: bool = True
     ) -> Dict:
         """
-        Train model with early stopping and model checkpointing.
+        Train model with early stopping.
         
         Args:
             train_loader: Training DataLoader
             val_loader: Validation DataLoader
-            num_epochs: Maximum training epochs
-            early_stopping_patience: Stop if no improvement for N epochs
-            save_path: Path to save best model checkpoint
+            num_epochs: Maximum epochs
+            early_stopping_patience: Early stopping patience
+            save_path: Path to save best model
             verbose: Show progress bar
-        
+            
         Returns:
-            Training history dict with losses and C-indices
+            Training history dict
         """
         best_val_loss = float('inf')
         patience_counter = 0
         
-        # Setup progress bar
         iterator = tqdm(range(num_epochs), desc="Training") if verbose else range(num_epochs)
         
         for epoch in iterator:
+            # Power learning rate decay (vanilla DeepSurv)
+            if self.lr_decay > 0:
+                current_lr = self.initial_lr / (1 + epoch * self.lr_decay)
+                for param_group in self.optimizer.param_groups:
+                    param_group['lr'] = current_lr
+            
             # Train and validate
             train_loss, train_ci = self.train_epoch(train_loader)
             val_loss, val_ci = self.validate(val_loader)
@@ -208,12 +194,11 @@ class Trainer:
                     'val_ci': f'{val_ci:.4f}'
                 })
             
-            # Save best model and early stopping
+            # Save best model
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 patience_counter = 0
                 
-                # Save checkpoint
                 if save_path:
                     os.makedirs(os.path.dirname(save_path), exist_ok=True)
                     torch.save({

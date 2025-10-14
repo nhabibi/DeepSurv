@@ -149,8 +149,12 @@ def create_synthetic_data(
     
     # Generate features and compute hazard
     if data_type == 'linear':
+        # Standardized features
         features = np.random.randn(n_samples, n_features)
-        hazard = np.exp(0.5 * features[:, 0] - 0.3 * features[:, 1])
+        # Use all features with varying weights (stronger signal)
+        weights = np.array([1.0, -0.8, 0.6, -0.4, 0.3, -0.2, 0.15, -0.1, 0.05, -0.03])[:n_features]
+        log_hazard = np.dot(features, weights)
+        hazard = np.exp(log_hazard)
     elif data_type == 'gaussian':
         features = np.random.uniform(-1, 1, size=(n_samples, n_features))
         z = np.sum(features[:, :2] ** 2, axis=1)
@@ -159,7 +163,9 @@ def create_synthetic_data(
         raise ValueError(f"data_type must be 'linear' or 'gaussian', got: {data_type}")
     
     # Generate survival and censoring times
-    survival_times = np.random.exponential(1.0 / hazard)
+    # Normalize hazard to prevent numerical issues
+    hazard = hazard / np.mean(hazard)
+    survival_times = np.random.exponential(1.0 / (hazard + 1e-8))
     censoring_times = np.random.exponential(2.0, size=n_samples)
     
     # Observed times and event indicators

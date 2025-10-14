@@ -1,22 +1,29 @@
 # DeepSurv: Cox Proportional Hazards Deep Neural Network
 
-PyTorch implementation of **[DeepSurv](https://arxiv.org/abs/1606.00931)** for survival analysis with comorbidity extension.
+**Vanilla PyTorch implementation** of **[DeepSurv](https://arxiv.org/abs/1606.00931)** for survival analysis.
 
-**Paper**: [Katzman et al., 2018](https://arxiv.org/abs/1606.00931) | [Original Code](https://github.com/jaredleekatzman/DeepSurv)
+**Paper**: [Katzman et al., 2018](https://arxiv.org/abs/1606.00931) | [Original Code (Theano/Lasagne)](https://github.com/jaredleekatzman/DeepSurv)
+
+This is a faithful PyTorch reimplementation of the original DeepSurv architecture and hyperparameters.
 
 ---
 
 ## 🎯 3-Phase Roadmap
 
-### **Phase 1: Learn** 📚
-Implement and validate DeepSurv on benchmark datasets
-- Train on simulated + METABRIC
-- Verify C-index matches paper (±0.03)
+### **Phase 1: Learn** 📚 (Current)
+Implement and validate vanilla DeepSurv on benchmark datasets
+- ✅ Vanilla architecture: [25, 25] hidden layers
+- ✅ SGD with Nesterov momentum (no Adam)
+- ✅ No Batch Normalization, No Dropout
+- ✅ Strong L2 regularization (10.0)
+- ✅ Power learning rate decay
+- 🔄 Train on simulated data
+- ⏳ Verify C-index matches paper (±0.03)
 - **Time**: 1-2 weeks
 
 ### **Phase 2: Extend** 🔬
 Apply to SEER with comorbidity features
-- Use METABRIC hyperparameters (same domain)
+- Use validated hyperparameters
 - Add comorbidity features
 - Establish baseline
 - **Time**: 2-3 months
@@ -30,7 +37,7 @@ Novel architecture + hyperparameter tuning
 
 ---
 
-## 📊 Phase 1: Essential Datasets
+## 📊 Phase 1: Expected Benchmarks
 
 | Dataset | Type | Size | Expected C-Index |
 |---------|------|------|------------------|
@@ -38,46 +45,81 @@ Novel architecture + hyperparameter tuning
 | Simulated (Gaussian) | Synthetic | 5K | ~0.75 |
 | METABRIC | Cancer | 2K | ~0.65-0.68 |
 
-**Note**: Other datasets (WHAS, SUPPORT, GBSG, Rotterdam) are optional. See `data/README.md` for details.
+**Phase 1 Goal**: Achieve C-indices within ±0.03 of paper results
 
 ---
 
 ## 🚀 Quick Start
 
+### 1. Install Dependencies
+
 ```bash
-# 1. Install
 pip install torch numpy pandas scikit-learn matplotlib scipy tqdm
-
-# 2. Train on simulated data
-python main.py --data data/simulated/linear.csv
-
-# 3. Train on METABRIC
-python main.py --data data/metabric/metabric.csv
-
-# ✅ Phase 1 complete when all C-indices match (±0.03)
 ```
+
+Or using requirements.txt:
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Train on Synthetic Data
+
+```bash
+# Linear synthetic data (should achieve C-index ~0.80)
+python main.py --data-type linear --n-samples 5000 --n-features 10
+
+# Gaussian synthetic data (should achieve C-index ~0.75)
+python main.py --data-type gaussian --n-samples 5000 --n-features 10
+```
+
+### 3. Train on Your Own Data
+
+```bash
+python main.py --data path/to/your/data.csv
+```
+
+Your CSV should have columns: features, `time`, `event`
 
 ---
 
-## 📁 Structure
+## 📁 Project Structure
 
 ```
 DeepSurv/
-├── config.py          # Hyperparameters
-├── model.py           # Network architecture
-├── loss.py            # Cox PH loss
-├── data_loader.py     # Data preprocessing
-├── train.py           # Training loop
+├── config.py          # Vanilla hyperparameters from paper
+├── model.py           # DeepSurv neural network (PyTorch)
+├── loss.py            # Cox PH loss (Efron/Breslow)
+├── data_loader.py     # Data preprocessing & synthetic generation
+├── train.py           # Training loop with SGD+Nesterov
 ├── evaluation.py      # C-index & visualization
 ├── main.py            # Entry point
-└── data/              # Datasets + README
+└── requirements.txt   # Dependencies
 ```
 
 ---
 
-## 🎓 Research Goal
+## ⚙️ Vanilla Configuration (Phase 1)
 
-PhD thesis on survival analysis with **comorbidity** (multiple cancers) using SEER data.
+### Model Architecture
+- **Hidden Layers**: [25, 25]
+- **Activation**: ReLU (rectify)
+- **Dropout**: None (disabled)
+- **Batch Normalization**: None (disabled)
+- **Standardization**: Enabled
+
+### Training Parameters
+- **Optimizer**: SGD with Nesterov momentum
+- **Learning Rate**: 1e-4 (with power decay)
+- **Momentum**: 0.9
+- **L2 Regularization**: 10.0
+- **L1 Regularization**: 0.0
+- **Batch Size**: 64
+- **Max Epochs**: 2000
+- **Early Stopping**: Patience of 2000
+
+### Loss Function
+- **Method**: Efron (for tied event times)
+- **Type**: Negative log partial likelihood (Cox PH)
 
 ---
 
@@ -93,18 +135,20 @@ PhD thesis on survival analysis with **comorbidity** (multiple cancers) using SE
   year={2018}
 }
 ```
-features, times, events, _ = load_data('data/whas/whas.csv')
-
-# Prepare loaders
-train_loader, val_loader = prepare_data_loaders(features, times, events)
-
-# Create and train model
-model = DeepSurv(input_dim=features.shape[1])
-trainer = Trainer(model)
-history = trainer.fit(train_loader, val_loader, num_epochs=100)
-
-# Evaluate
-print(f"C-Index: {history['val_ci'][-1]:.4f}")
-```
 
 ---
+
+## 🎓 Research Goal
+
+PhD thesis on survival analysis with **comorbidity** (multiple cancers) using SEER data.
+
+**Current Status**: Phase 1 - Validating vanilla implementation
+
+---
+
+## 📝 Notes
+
+- This implementation uses **PyTorch** instead of the original **Theano/Lasagne**
+- All hyperparameters match the original paper's defaults
+- No modifications or improvements yet (that comes in Phase 3)
+- Apple Silicon (M1/M2/M3) GPU support via MPS backend

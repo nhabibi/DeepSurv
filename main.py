@@ -1,5 +1,5 @@
 """
-Main script to train DeepSurv.
+Main script to train vanilla DeepSurv
 """
 
 import os
@@ -15,82 +15,72 @@ from train import Trainer
 from evaluation import evaluate_model, plot_training_curves, plot_risk_distribution
 
 
-# ============================================================================
-# Utility Functions
-# ============================================================================
-
 def parse_args():
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description='Train DeepSurv model')
-    
-    # Data arguments
+    parser = argparse.ArgumentParser(description='Train vanilla DeepSurv')
     parser.add_argument('--data', type=str, default=None,
-                        help='Path to CSV data file (if not provided, synthetic data is used)')
+                        help='Path to CSV file (default: use synthetic data)')
     parser.add_argument('--data-type', type=str, default='linear',
-                        choices=['linear', 'gaussian', 'treatment'],
-                        help='Type of synthetic data to generate')
+                        choices=['linear', 'gaussian'],
+                        help='Synthetic data type: linear or gaussian')
     parser.add_argument('--n-samples', type=int, default=5000,
-                        help='Number of samples for synthetic data')
+                        help='Number of synthetic samples')
     parser.add_argument('--n-features', type=int, default=10,
-                        help='Number of features for synthetic data')
-    
-    # Device argument
+                        help='Number of features')
     parser.add_argument('--cpu', action='store_true',
-                        help='Force CPU usage even if CUDA is available')
-    
+                        help='Force CPU (disable GPU)')
     return parser.parse_args()
 
 
 def set_seed(seed: int):
-    """Set random seeds for reproducibility."""
+    """Set random seed for reproducibility."""
     torch.manual_seed(seed)
     np.random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
 
-# ============================================================================
-# Main Training Pipeline
-# ============================================================================
+def select_device(force_cpu: bool = False) -> str:
+    """Select device: MPS > CUDA > CPU."""
+    if force_cpu:
+        return 'cpu'
+    elif torch.cuda.is_available():
+        return 'cuda'
+    elif torch.backends.mps.is_available():
+        return 'mps'
+    else:
+        return 'cpu'
+
 
 def main():
-    """Main training pipeline - load data, create model, train, evaluate."""
+    """Main training pipeline."""
     
-    # Parse command-line arguments
+    # Parse arguments
     args = parse_args()
-    
-    # ------------------------------------------------------------------------
-    # Setup
-    # ------------------------------------------------------------------------
     set_seed(DATA_CONFIG['random_seed'])
     
     # Create output directories
     for path in PATHS.values():
         os.makedirs(path, exist_ok=True)
     
-    # Select device: MPS (Apple Silicon GPU) > CUDA > CPU
-    if args.cpu:
-        device = 'cpu'
-    elif torch.cuda.is_available():
-        device = 'cuda'
-    elif torch.backends.mps.is_available():
-        device = 'mps'
-    else:
-        device = 'cpu'
-    
+    # Select device
+    device = select_device(args.cpu)
     print(f"Using device: {device}")
     if device == 'mps':
-        print("🚀 Using Apple Silicon GPU (MPS) for acceleration!")
+        print("🚀 Using Apple Silicon GPU (MPS)")
     elif device == 'cuda':
-        print("🚀 Using NVIDIA GPU (CUDA) for acceleration!")
+        print("🚀 Using NVIDIA GPU (CUDA)")
     
+    # ------------------------------------------------------------------------
+    # Load Data
+    # ------------------------------------------------------------------------
     print("\n" + "="*50)
     print("Loading data...")
     print("="*50)
     
     if args.data:
-        # Load from CSV file
-        features, times, events, scaler = load_data(
+        # Load from CSV
+        features, times, events, _ = load_data(
             args.data,
             normalize=DATA_CONFIG['normalize']
         )
@@ -104,7 +94,7 @@ def main():
             random_seed=DATA_CONFIG['random_seed']
         )
     
-    print(f"Data shape: {features.shape}")
+    print(f"Data: {features.shape[0]} samples, {features.shape[1]} features")
     print(f"Events: {int(events.sum())}, Censored: {int((1-events).sum())}")
     print(f"Event rate: {events.mean():.1%}")
     
@@ -117,6 +107,7 @@ def main():
         validation_split=TRAINING_CONFIG['validation_split'],
         random_seed=DATA_CONFIG['random_seed']
     )
+    
     # ------------------------------------------------------------------------
     # Create Model
     # ------------------------------------------------------------------------
@@ -128,7 +119,7 @@ def main():
     model = DeepSurv(**MODEL_CONFIG)
     
     print(model)
-    print(f"Total parameters: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}")
     
     # ------------------------------------------------------------------------
     # Train Model
@@ -141,8 +132,11 @@ def main():
         model=model,
         device=device,
         learning_rate=TRAINING_CONFIG['learning_rate'],
-        l2_reg=TRAINING_CONFIG['l2_reg'],
+        lr_decay=TRAINING_CONFIG['lr_decay'],
+        momentum=TRAINING_CONFIG['momentum'],
         optimizer_name=TRAINING_CONFIG['optimizer'],
+        l2_reg=TRAINING_CONFIG['l2_reg'],
+        l1_reg=TRAINING_CONFIG['l1_reg'],
         loss_method=LOSS_CONFIG['method']
     )
     
@@ -155,33 +149,28 @@ def main():
     )
     
     # ------------------------------------------------------------------------
-    # Save and Visualize Results
+    # Results
     # ------------------------------------------------------------------------
     print("\n" + "="*50)
-    print("Saving results...")
+    print("Results")
     print("="*50)
     
-    # Training curves
+    # Plot training curves
     plot_training_curves(
         history,
         save_path=os.path.join(PATHS['results_dir'], 'training_curves.png')
     )
-    print("✓ Training curves saved")
     
     # Evaluate on validation set
     val_ci, val_risks, val_times, val_events = evaluate_model(model, val_loader, device)
-    print(f"✓ Validation C-Index: {val_ci:.4f}")
     
-    # Risk distribution plot
+    # Plot risk distribution
     plot_risk_distribution(
         val_risks, val_events,
         save_path=os.path.join(PATHS['results_dir'], 'risk_distribution.png')
     )
-    print("✓ Risk distribution saved")
     
-    # ------------------------------------------------------------------------
-    # Save Final Results
-    # ------------------------------------------------------------------------
+    # Save results
     results = {
         'final_train_loss': history['train_loss'][-1],
         'final_val_loss': history['val_loss'][-1],
@@ -193,18 +182,10 @@ def main():
     with open(os.path.join(PATHS['results_dir'], 'results.json'), 'w') as f:
         json.dump(results, f, indent=4)
     
-    print("\n" + "="*50)
-    print("Final Results:")
-    print("="*50)
-    for key, value in results.items():
-        print(f"  {key}: {value:.4f}")
-    
-    print("\n✅ Training complete!")
+    print(f"\n✅ Final C-Index: {val_ci:.4f}")
+    print(f"✅ Best C-Index: {max(history['val_ci']):.4f}")
+    print("\nTraining complete!")
 
-
-# ============================================================================
-# Run
-# ============================================================================
 
 if __name__ == "__main__":
     main()
