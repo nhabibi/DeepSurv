@@ -20,7 +20,7 @@ All other parameters remain exactly vanilla.
 
 # Model Architecture (Vanilla)
 MODEL_CONFIG = {
-    'input_dim': None,              # Set automatically from data
+    'input_dim': None,              # Set automatically from data (10 for synthetic, 25 for SEER)
     'hidden_layers': [25, 25],      # Original: [25, 25]
     'activation': 'relu',           # Original: rectify (ReLU)
     'dropout': 0.0,                 # Original: None (disabled)

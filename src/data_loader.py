@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 
 # ============================================================================
@@ -77,6 +77,75 @@ def load_data(
         features = scaler.fit_transform(features)
     
     return features, times, events, scaler
+
+
+def load_seer_data(
+    file_path: str,
+    time_col: str = 'survival_months',
+    event_col: str = 'vital_status',
+    normalize: bool = True
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Optional[StandardScaler], List[str]]:
+    """
+    Load SEER-like data from CSV file with categorical encoding.
+    
+    Args:
+        file_path: Path to CSV file
+        time_col: Survival time column name
+        event_col: Event indicator column (1=dead, 0=alive/censored)
+        normalize: Normalize numerical features
+    
+    Returns:
+        features, times, events, scaler, feature_names
+    """
+    df = pd.read_csv(file_path)
+    
+    print(f"Loaded {len(df)} patients from {file_path}")
+    
+    # Identify categorical and numerical columns
+    categorical_cols = ['race', 'marital_status', 'cancer_site']
+    numerical_cols = [
+        'age', 'stage', 'grade', 'tumor_size_cm', 'n_positive_nodes',
+        'surgery', 'radiation', 'chemotherapy',
+        'diabetes', 'hypertension', 'heart_disease', 'copd', 
+        'kidney_disease', 'liver_disease', 'charlson_cci'
+    ]
+    
+    # Extract numerical features
+    numerical_features = df[numerical_cols].values
+    feature_names = numerical_cols.copy()
+    
+    # One-hot encode categorical features
+    encoded_features = []
+    for col in categorical_cols:
+        # Get unique values
+        unique_vals = sorted(df[col].unique())
+        # Create dummy variables (one-hot)
+        for val in unique_vals:
+            encoded_features.append((df[col] == val).astype(float).values)
+            feature_names.append(f"{col}_{val}")
+    
+    # Combine all features
+    if encoded_features:
+        categorical_array = np.column_stack(encoded_features)
+        features = np.hstack([numerical_features, categorical_array])
+    else:
+        features = numerical_features
+    
+    # Extract outcomes
+    times = df[time_col].values
+    events = df[event_col].values
+    
+    # Normalize numerical features only
+    scaler = None
+    if normalize:
+        scaler = StandardScaler()
+        # Only standardize the numerical columns (first len(numerical_cols) columns)
+        features[:, :len(numerical_cols)] = scaler.fit_transform(features[:, :len(numerical_cols)])
+    
+    print(f"Features: {features.shape[1]} total ({len(numerical_cols)} numerical + {len(feature_names)-len(numerical_cols)} categorical)")
+    print(f"Events: {events.sum()} deaths ({events.mean()*100:.1f}%), {(1-events).sum()} censored ({(1-events.mean())*100:.1f}%)")
+    
+    return features, times, events, scaler, feature_names
 
 
 # ============================================================================

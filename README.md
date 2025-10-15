@@ -6,128 +6,78 @@
 
 ---
 
+## 🗺️ Research Roadmap
+
+| Phase | Status | Goal |
+|-------|--------|------|
+| **1. Vanilla Baseline** | ✅ Complete | Establish baseline (C-index=0.7111) |
+| **2. SEER Application** | 🔄 In Progress | Apply to clinical cancer data |
+| **3. Comorbidity Analysis** | 📋 Planned | Study dual-cancer survival patterns |
+| **4. Comorbidity-Aware Arch** | 🔮 Future | Multi-input, attention, cross-stitch |
+| **5. Advanced Methods** | 🔮 Optional | DeepHit, RSF, Transformers |
+
+---
+
 ## 📂 Project Structure
 
 ```
 DeepSurv/
-├── README.md                      # This file
-├── main.py                        # Training entry point
-├── requirements.txt               # Dependencies
-│
-├── src/                           # Core implementation
-│   ├── config.py                 # Hyperparameters
-│   ├── model.py                  # DeepSurv architecture
-│   ├── loss.py                   # Cox proportional hazards loss
-│   ├── train.py                  # Training loop
-│   ├── evaluation.py             # C-index evaluation
-│   └── data_loader.py            # Data loading utilities
-│
-├── phase1_vanilla/                # Phase 1: Vanilla DeepSurv baseline
-│   ├── README.md                 # Phase 1 overview
-│   ├── docs/                     # Documentation
-│   │   ├── VANILLA_BASELINE.md   # Technical implementation details
-│   │   ├── PHASE1_SUMMARY.md     # Research summary for thesis
-│   │   └── FINAL_RESULTS.md      # Validated results (C-index=0.7111)
-│   └── scripts/                  # Testing scripts
-│       ├── find_minimal_l2.py    # L2 regularization testing
-│       └── save_synthetic_data.py # Data saving utility
-│
-├── phase2_seer/                   # Phase 2: SEER data application
-│   ├── README.md                 # Phase 2 overview
-│   ├── docs/                     # Documentation
-│   │   ├── SEER_GUIDE.md         # SEER integration guide
-│   │   └── SEER_QUESTIONS.md     # Data requirements
-│   └── scripts/                  # SEER-specific scripts (to be added)
-│
-├── data/                          # Data directory
-│   ├── synthetic/                # Synthetic survival data
-│   └── seer/                     # SEER data (when available)
-│
-└── results/                       # Training outputs
-    ├── checkpoints/              # Model weights (.pt files)
-    ├── figures/                  # Training curves and plots
-    └── logs/                     # Training metrics (.json)
+├── main.py, requirements.txt
+├── src/                           # model, loss, train, eval, data_loader
+├── phase1_vanilla/                # Docs + scripts
+├── phase2_seer/                   # Docs + scripts  
+├── data/
+│   ├── vanilla_synthetic_linear/  # Phase 1
+│   └── seer/                      # Phase 2+
+└── results/                       # checkpoints, figures, logs
 ```
 
 ---
 
 ## 🎯 Quick Start
 
-### Installation
 ```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
+# Install
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
 
-### Run Training
-```bash
-# Train on synthetic data
+# Train vanilla baseline
 python main.py --data-type linear --n-samples 5000 --n-features 10
 
-# Options
-python main.py --help
+# Train on SEER data  
+python main.py --data-source seer
 ```
 
 ---
 
 ## 🔍 What Does DeepSurv Predict?
 
-**DeepSurv predicts RISK SCORE (log hazard ratio), NOT time or event!**
+**Output**: Risk score f(x) ∈ ℝ, not survival time or event probability.
 
-- **Input**: Patient features [feature_1, ..., feature_10]
-- **Output**: Single risk score (e.g., 0.85, -0.30)
-- **Interpretation**: 
-  - Higher score → Higher risk of death (sooner)
-  - Lower score → Lower risk of death (later)
-- **Training**: Uses (time, event) to learn relative risk ranking
-- **Evaluation**: C-index measures ranking accuracy (0.71 = 71% pairs correctly ordered)
+**Cox Framework**: Learns relative risk ranking using Cox partial likelihood (Cox, 1972). For patient i with (tᵢ, δᵢ):
+- δᵢ = 1 (event): tᵢ is true survival time
+- δᵢ = 0 (censored): tᵢ is lower bound, true time unknown
 
-**NOT predicted**: Exact survival time, probability of death  
-**Purpose**: Rank patients by relative risk for clinical decisions
+**Why ranking?** Censoring makes regression infeasible (undefined target). Cox partial likelihood requires only ordering information.
+
+**Time prediction alternatives**: Parametric (Weibull AFT), Random Survival Forests (2008), DeepHit (2018), SurvTRACE (2022).
 
 ---
 
-## 📚 Documentation
+## � Phase 1 Results
 
-### Phase 1: Vanilla Baseline (✅ Complete)
-- **[Overview](phase1_vanilla/README.md)** - Phase 1 summary
-- **[Results](phase1_vanilla/docs/FINAL_RESULTS.md)** - C-index=0.7111 on synthetic data
-- **[Technical Details](phase1_vanilla/docs/VANILLA_BASELINE.md)** - Implementation specifics
-- **[Research Summary](phase1_vanilla/docs/PHASE1_SUMMARY.md)** - For thesis writing
+| Metric | Value |
+|--------|-------|
+| **C-Index** | **0.7111** |
+| Dataset | Synthetic linear, 5000 samples, 10 features |
+| Architecture | [25, 25] ReLU (vanilla) |
+| Hyperparameters | LR=1e-3, L2=0.01, SGD+Nesterov |
+| Training | 164 epochs (early stopped) |
+| Device | Apple M1 (MPS) |
 
-**Key Achievement**: Validated vanilla DeepSurv baseline with 2 framework-required adaptations (LR×10, L2÷1000)
+**Framework Adaptations**: LR×10 and L2÷1000 due to PyTorch/Theano differences. Empirically validated.
 
-### Phase 2: SEER Data (🔄 Ready)
-- **[Overview](phase2_seer/README.md)** - Phase 2 plan
-- **[SEER Guide](phase2_seer/docs/PHASE2_SEER_GUIDE.md)** - Integration steps
-- **[Data Questions](phase2_seer/docs/SEER_QUESTIONS.md)** - What data is needed
-
-**Next Step**: Answer SEER questions to begin Phase 2
-
----
-
-## 🎓 Research Summary
-
-### Objective
-Establish valid vanilla DeepSurv baseline in PyTorch for survival analysis research.
-
-### Approach
-- Implement vanilla architecture: [25, 25] ReLU network
-- Cox proportional hazards loss (Efron approximation)
-- Minimal framework-required adaptations
-- Extensive empirical validation
-
-### Results
-- **Best C-Index**: 0.7111 on synthetic linear data
-- **Framework Adaptations**: 2 hyperparameters (LR, L2)
-- **Validation**: Multiple test runs confirming reproducibility
-
-### For Thesis
-> "We established a vanilla DeepSurv baseline with the original architecture from Katzman et al. (2018). Due to mathematical differences between Theano/Lasagne and PyTorch regularization, we made two empirically-validated framework adjustments. This provides a valid baseline for comparing comorbidity-aware survival models."
+**Docs**: See `phase1_vanilla/docs/` for technical details and thesis summary.
 
 ---
 
@@ -135,55 +85,24 @@ Establish valid vanilla DeepSurv baseline in PyTorch for survival analysis resea
 
 Key hyperparameters in `src/config.py`:
 
-| Parameter | Value | Notes |
-|-----------|-------|-------|
-| Architecture | [25, 25] | Vanilla hidden layers |
-| Activation | ReLU | No changes |
-| Learning Rate | 1e-3 | Adapted (Theano→PyTorch) |
-| L2 Regularization | 0.01 | Adapted (weight_decay semantics) |
-| Optimizer | SGD + Nesterov | Vanilla (momentum=0.9) |
-| Batch Size | 64 | Vanilla |
-| Early Stopping | 50 epochs | Vanilla |
-
-See [VANILLA_BASELINE.md](phase1_vanilla/docs/VANILLA_BASELINE.md) for complete details.
+| Parameter | Vanilla | Adapted | Reason |
+|-----------|---------|---------|--------|
+| Architecture | [25, 25] ReLU | ✓ | - |
+| Optimizer | SGD+Nesterov (momentum=0.9) | ✓ | - |
+| Batch Size | 64 | ✓ | - |
+| Early Stop | 50 epochs | ✓ | - |
+| **Learning Rate** | 1e-4 | **1e-3** | PyTorch optimization dynamics |
+| **L2 Reg** | 10.0 | **0.01** | PyTorch weight_decay semantics |
 
 ---
 
-## 📊 Results
+## � References
 
-### Phase 1: Synthetic Data
-- **Dataset**: 5000 samples, 10 features, linear hazard
-- **Best C-Index**: 0.7111
-- **Training**: 164 epochs (early stopped)
-- **Device**: Apple M1 (MPS)
-
-### Validation
-- ✅ Model learns successfully
-- ✅ Achieves C-index > 0.70
-- ✅ Reproducible across runs
-- ✅ Framework adaptations validated
+- Cox, D. R. (1972). "Regression models and life-tables." *JRSS*.
+- Katzman, J. L., et al. (2018). "DeepSurv." *BMC Medical Research Methodology*, 18(1), 24.
+- Ishwaran, H., et al. (2008). "Random survival forests." *Ann. Appl. Stat*.
+- Lee, C., et al. (2018). "DeepHit." *AAAI*.
 
 ---
 
-## 🚀 Next Steps
-
-1. **Phase 2**: Apply to SEER cancer survival data
-2. **Phase 3**: Add comorbidity features
-3. **Phase 4**: Novel architectures and comparisons
-
----
-
-## 📖 References
-
-- Katzman, J. L., et al. (2018). "DeepSurv: personalized treatment recommender system using a Cox proportional hazards deep neural network." *BMC Medical Research Methodology*, 18(1), 24.
-- Original implementation: https://github.com/jaredleekatzman/DeepSurv
-
----
-
-## 📝 License
-
-This is research code for PhD thesis work. See institution policies for usage rights.
-
----
-
-**Status**: Phase 1 ✅ Complete | Phase 2 🔄 Ready to Start
+**Status**: Phase 1 ✅ Complete | Phase 2 🔄 In Progress | Research code for PhD thesis

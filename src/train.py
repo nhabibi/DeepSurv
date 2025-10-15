@@ -17,28 +17,32 @@ class Trainer:
     """
     Trainer for vanilla DeepSurv with SGD + Nesterov momentum.
     
+    All hyperparameters must be provided explicitly from config.py.
+    No defaults to ensure all values come from centralized configuration.
+    
     Args:
         model: DeepSurv model
         device: Device ('cpu', 'cuda', or 'mps')
-        learning_rate: Initial learning rate
-        lr_decay: Learning rate power decay coefficient
-        momentum: Momentum coefficient (for SGD)
-        optimizer_name: 'sgd' or 'adam'
-        l2_reg: L2 regularization (weight decay)
-        loss_method: 'efron' or 'breslow'
+        learning_rate: Initial learning rate (from config)
+        lr_decay: Learning rate power decay coefficient (from config)
+        momentum: Momentum coefficient for SGD (from config)
+        optimizer_name: 'sgd' or 'adam' (from config)
+        l2_reg: L2 regularization weight decay (from config)
+        l1_reg: L1 regularization (from config, currently unused)
+        loss_method: 'efron' or 'breslow' (from config)
     """
     
     def __init__(
         self,
         model,
-        device: str = 'cpu',
-        learning_rate: float = 1e-4,
-        lr_decay: float = 0.001,
-        momentum: float = 0.9,
-        optimizer_name: str = 'sgd',
-        l2_reg: float = 10.0,
-        l1_reg: float = 0.0,
-        loss_method: str = 'efron'
+        device: str,
+        learning_rate: float,
+        lr_decay: float,
+        momentum: float,
+        optimizer_name: str,
+        l2_reg: float,
+        l1_reg: float,
+        loss_method: str
     ):
         self.model = model.to(device)
         self.device = device

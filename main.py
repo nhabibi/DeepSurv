@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.config import MODEL_CONFIG, TRAINING_CONFIG, DATA_CONFIG, PATHS, LOSS_CONFIG
 from src.model import DeepSurv
-from src.data_loader import load_data, prepare_data_loaders, create_synthetic_data
+from src.data_loader import load_data, prepare_data_loaders, create_synthetic_data, load_seer_data
 from src.train import Trainer
 from src.evaluation import evaluate_model, plot_training_curves, plot_risk_distribution
 
@@ -24,6 +24,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train vanilla DeepSurv')
     parser.add_argument('--data', type=str, default=None,
                         help='Path to CSV file (default: use synthetic data)')
+    parser.add_argument('--data-source', type=str, default='synthetic',
+                        choices=['synthetic', 'seer'],
+                        help='Data source: synthetic or seer')
     parser.add_argument('--data-type', type=str, default='linear',
                         choices=['linear', 'gaussian'],
                         help='Synthetic data type: linear or gaussian')
@@ -83,11 +86,19 @@ def main():
     print("="*50)
     
     if args.data:
-        # Load from CSV
+        # Load from custom CSV path
         features, times, events, _ = load_data(
             args.data,
             normalize=DATA_CONFIG['normalize']
         )
+    elif args.data_source == 'seer':
+        # Load SEER data
+        print("Loading SEER breast+vaginal cancer data...")
+        features, times, events, _, feature_names = load_seer_data(
+            'data/seer/train_seer_breast_vaginal_5000.csv',
+            normalize=DATA_CONFIG['normalize']
+        )
+        print(f"SEER features: {', '.join(feature_names[:10])}...")
     else:
         # Generate synthetic data
         print(f"Generating synthetic {args.data_type} data...")
