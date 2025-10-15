@@ -93,6 +93,8 @@ def main():
             data_type=args.data_type,
             random_seed=DATA_CONFIG['random_seed']
         )
+        # Note: Synthetic data is already normalized (randn), 
+        # so no additional standardization needed
     
     print(f"Data: {features.shape[0]} samples, {features.shape[1]} features")
     print(f"Events: {int(events.sum())}, Censored: {int((1-events).sum())}")
@@ -142,7 +144,7 @@ def main():
     
     history = trainer.fit(
         train_loader, val_loader,
-        num_epochs=TRAINING_CONFIG['num_epochs'],
+        num_epochs=TRAINING_CONFIG['max_epochs'],
         early_stopping_patience=TRAINING_CONFIG['early_stopping_patience'],
         save_path=os.path.join(PATHS['model_dir'], 'best_model.pt'),
         verbose=True
