@@ -3,16 +3,20 @@ Main script to train vanilla DeepSurv
 """
 
 import os
+import sys
 import torch
 import numpy as np
 import json
 import argparse
 
-from config import MODEL_CONFIG, TRAINING_CONFIG, DATA_CONFIG, PATHS, LOSS_CONFIG
-from model import DeepSurv
-from data_loader import load_data, prepare_data_loaders, create_synthetic_data
-from train import Trainer
-from evaluation import evaluate_model, plot_training_curves, plot_risk_distribution
+# Add src to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
+from src.config import MODEL_CONFIG, TRAINING_CONFIG, DATA_CONFIG, PATHS, LOSS_CONFIG
+from src.model import DeepSurv
+from src.data_loader import load_data, prepare_data_loaders, create_synthetic_data
+from src.train import Trainer
+from src.evaluation import evaluate_model, plot_training_curves, plot_risk_distribution
 
 
 def parse_args():
@@ -146,7 +150,7 @@ def main():
         train_loader, val_loader,
         num_epochs=TRAINING_CONFIG['max_epochs'],
         early_stopping_patience=TRAINING_CONFIG['early_stopping_patience'],
-        save_path=os.path.join(PATHS['model_dir'], 'best_model.pt'),
+        save_path=os.path.join(PATHS['checkpoints_dir'], 'best_model.pt'),
         verbose=True
     )
     
@@ -160,7 +164,7 @@ def main():
     # Plot training curves
     plot_training_curves(
         history,
-        save_path=os.path.join(PATHS['results_dir'], 'training_curves.png')
+        save_path=os.path.join(PATHS['figures_dir'], 'training_curves.png')
     )
     
     # Evaluate on validation set
@@ -169,7 +173,7 @@ def main():
     # Plot risk distribution
     plot_risk_distribution(
         val_risks, val_events,
-        save_path=os.path.join(PATHS['results_dir'], 'risk_distribution.png')
+        save_path=os.path.join(PATHS['figures_dir'], 'risk_distribution.png')
     )
     
     # Save results
@@ -181,7 +185,7 @@ def main():
         'best_val_ci': max(history['val_ci']),
     }
     
-    with open(os.path.join(PATHS['results_dir'], 'results.json'), 'w') as f:
+    with open(os.path.join(PATHS['logs_dir'], 'results.json'), 'w') as f:
         json.dump(results, f, indent=4)
     
     print(f"\n✅ Final C-Index: {val_ci:.4f}")

@@ -3,16 +3,21 @@ Find minimal L2 adjustment required for PyTorch.
 Goal: Stay as close to vanilla L2=10.0 as possible while enabling learning.
 """
 
+import sys
 import os
 import torch
 import numpy as np
-from config import MODEL_CONFIG, TRAINING_CONFIG, DATA_CONFIG, PATHS, LOSS_CONFIG
-from model import DeepSurv
-from data_loader import create_synthetic_data, prepare_data_loaders
-from train import Trainer
-
 import warnings
 warnings.filterwarnings('ignore')
+
+# Add project root to path for imports
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, project_root)
+
+from src.config import MODEL_CONFIG, TRAINING_CONFIG, DATA_CONFIG, PATHS, LOSS_CONFIG
+from src.model import DeepSurv
+from src.data_loader import create_synthetic_data, prepare_data_loaders
+from src.train import Trainer
 
 
 def test_l2(l2_value, device='mps'):

@@ -11,11 +11,14 @@ venv/
 ENV/
 env/
 
-# Output directories
-models/
-results/
-data/
-logs/
+# Output directories (but keep structure)
+results/checkpoints/*.pt
+results/figures/*.png
+results/logs/*.json
+data/synthetic/*.csv
+data/seer/*
+!data/synthetic/.gitkeep
+!data/seer/.gitkeep
 
 # Jupyter Notebook
 .ipynb_checkpoints

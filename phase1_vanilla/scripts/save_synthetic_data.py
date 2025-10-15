@@ -3,10 +3,17 @@ Save synthetic data for analysis and inspection.
 This helps understand the data structure before applying to real SEER data.
 """
 
+import sys
+import os
 import numpy as np
 import pandas as pd
-from data_loader import generate_synthetic_data
 from pathlib import Path
+
+# Add project root to path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, project_root)
+
+from src.data_loader import create_synthetic_data
 
 def save_synthetic_data(n_samples=5000, n_features=10, data_type='linear'):
     """Generate and save synthetic survival data."""
@@ -16,24 +23,42 @@ def save_synthetic_data(n_samples=5000, n_features=10, data_type='linear'):
     print(f"  Features: {n_features}")
     
     # Generate data
-    X_train, X_val, X_test, y_train, y_val, y_test, feature_names = generate_synthetic_data(
+    features, times, events = create_synthetic_data(
         n_samples=n_samples,
         n_features=n_features,
         data_type=data_type
     )
     
+    # Split into train/val/test (70/15/15)
+    train_size = int(0.7 * n_samples)
+    val_size = int(0.15 * n_samples)
+    
+    X_train = features[:train_size]
+    X_val = features[train_size:train_size+val_size]
+    X_test = features[train_size+val_size:]
+    
+    y_train_time = times[:train_size]
+    y_train_event = events[:train_size]
+    y_val_time = times[train_size:train_size+val_size]
+    y_val_event = events[train_size:train_size+val_size]
+    y_test_time = times[train_size+val_size:]
+    y_test_event = events[train_size+val_size:]
+    
+    # Create feature names
+    feature_names = [f'feature_{i+1}' for i in range(n_features)]
+    
     # Create DataFrames for better inspection
     train_df = pd.DataFrame(X_train, columns=feature_names)
-    train_df['time'] = y_train[:, 0]
-    train_df['event'] = y_train[:, 1]
+    train_df['time'] = y_train_time
+    train_df['event'] = y_train_event
     
     val_df = pd.DataFrame(X_val, columns=feature_names)
-    val_df['time'] = y_val[:, 0]
-    val_df['event'] = y_val[:, 1]
+    val_df['time'] = y_val_time
+    val_df['event'] = y_val_event
     
     test_df = pd.DataFrame(X_test, columns=feature_names)
-    test_df['time'] = y_test[:, 0]
-    test_df['event'] = y_test[:, 1]
+    test_df['time'] = y_test_time
+    test_df['event'] = y_test_event
     
     # Save to CSV
     output_dir = Path('data/synthetic')

@@ -56,6 +56,8 @@ LOSS_CONFIG = {
 
 # Output Directories
 PATHS = {
-    'model_dir': 'models/',
-    'results_dir': 'results/',
+    'checkpoints_dir': 'results/checkpoints/',
+    'figures_dir': 'results/figures/',
+    'logs_dir': 'results/logs/',
+    'results_dir': 'results/',  # Parent directory
 }
