@@ -62,9 +62,15 @@ python main.py --data-source seer
 
 **Time prediction alternatives**: Parametric (Weibull AFT), Random Survival Forests (2008), DeepHit (2018), SurvTRACE (2022).
 
+**Input flexibility**: Architecture `[25, 25]` adapts to any input size. For `input_dim=d`, first layer weight matrix is `W₁ ∈ ℝ^(25×d)`, automatically allocated by `nn.Linear(d, 25)`. Example:
+- Vanilla synthetic (10 features): `10 → [25, 25] → 1`
+- SEER comorbid (25 features): `25 → [25, 25] → 1`
+
+**Output targets**: Both use `(survival_months, vital_status)` for Cox loss supervision, not direct prediction.
+
 ---
 
-## � Phase 1 Results
+## 📊 Phase 1 Results
 
 | Metric | Value |
 |--------|-------|
