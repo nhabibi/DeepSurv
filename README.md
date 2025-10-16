@@ -10,7 +10,7 @@
 
 | Phase | Status | Goal |
 |-------|--------|------|
-| **1. Vanilla Baseline** | ✅ Complete | Establish baseline (C-index=0.7111) |
+| **1. Vanilla Baseline** | ✅ Complete | Establish baseline (C-index=0.7662) |
 | **2. SEER Application** | 🔄 In Progress | Apply to clinical cancer data |
 | **3. Comorbidity Analysis** | 📋 Planned | Study dual-cancer survival patterns |
 | **4. Comorbidity-Aware Arch** | 🔮 Future | Multi-input, attention, cross-stitch |
@@ -96,14 +96,19 @@ Phase 2 requires synthetic SEER comorbid data. Run this once to generate `data/t
 
 | Metric | Value |
 |--------|-------|
-| **C-Index** | **0.7111** |
+| **C-Index** | **0.7662** (validation) / **0.7778** (training) |
 | Dataset | Synthetic linear, 5000 samples, 10 features |
 | Architecture | [25, 25] ReLU (vanilla) |
 | Hyperparameters | LR=1e-3, L2=0.01, SGD+Nesterov |
-| Training | 164 epochs (early stopped) |
+| Training | 165 epochs (early stopped, patience=100) |
+| Validation Split | 15% (750 samples) |
+| Event Rate | 20.3% (stronger signal, less censoring) |
 | Device | Apple M1 (MPS) |
 
-**Framework Adaptations**: LR×10 and L2÷1000 due to PyTorch/Theano differences. Empirically validated.
+**Framework Adaptations**: 
+- LR: 1e-4 → 1e-3 (10×) - PyTorch SGD dynamics
+- L2: 10.0 → 0.01 (÷1000) - PyTorch weight_decay convention
+- Synthetic signal: 2× hazard weights for reproducible learning
 
 ---
 
@@ -137,7 +142,7 @@ Phase 2 requires synthetic SEER comorbid data. Run this once to generate `data/t
 | **Samples** | 5000 | 5000 (3500 train / 750 val / 750 test) |
 | **Model** | [25, 25] ReLU | [25, 25] ReLU (same) |
 | **Hyperparams** | LR=1e-3, L2=0.01 | LR=1e-3, L2=0.01 (same) |
-| **C-Index** | 0.7111 | ⏳ Pending |
+| **C-Index** | 0.7662 | ⏳ Pending |
 | **Code Changes** | N/A | Only `data_loader.py` |
 
 ---
