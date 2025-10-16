@@ -22,15 +22,21 @@
 
 ```
 DeepSurv/
-├── main.py, requirements.txt
-├── src/                           # model, loss, train, eval, data_loader
-├── phase1_vanilla/                # Docs + scripts
-├── phase2_seer/                   # Docs + scripts  
-├── data/
-│   ├── vanilla_synthetic_linear/  # Phase 1
-│   └── seer/                      # Phase 2+
-└── results/                       # checkpoints, figures, logs
+├── README.md                      # All documentation (this file)
+├── requirements.txt
+├── phase1_vanilla/
+│   ├── main.py                    # --generate-data to save, then train
+│   ├── src/                       # Vanilla codebase
+│   ├── data/                      # → train/val/test_synthetic.csv
+│   └── results/                   # → checkpoints/, figures/
+└── phase2_seer/
+    ├── main.py                    # Training script
+    ├── src/                       # SEER codebase (data_loader modified)
+    ├── data/                      # → train/val/test_comorbid.csv
+    └── results/                   # → checkpoints/, figures/
 ```
+
+**Design**: Maximally minimal. All docs in README. Each phase self-contained.
 
 ---
 
@@ -41,11 +47,27 @@ DeepSurv/
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# Train vanilla baseline
-python main.py --data-type linear --n-samples 5000 --n-features 10
+# Phase 1
+cd phase1_vanilla
+python main.py --generate-data  # Generate & save data
+python main.py                  # Train
 
-# Train on SEER data  
-python main.py --data-source seer
+# Phase 2  
+cd ../phase2_seer
+# Generate data first (see SEER Data Generation below)
+python main.py                  # Train
+```
+
+---
+
+## 📊 SEER Data Generation
+
+Phase 2 requires synthetic SEER comorbid data. Run this once to generate `data/train|val|test_comorbid.csv`:
+
+```python
+# Save as generate_seer.py in phase2_seer/ and run once
+# See phase2_seer/src/data_loader.py for schema details
+# Or use real SEER data if available
 ```
 
 ---
@@ -83,7 +105,40 @@ python main.py --data-source seer
 
 **Framework Adaptations**: LR×10 and L2÷1000 due to PyTorch/Theano differences. Empirically validated.
 
-**Docs**: See `phase1_vanilla/docs/` for technical details and thesis summary.
+---
+
+## 📊 Phase 2: SEER Application
+
+**Status**: 🔄 In Progress
+
+**Data**: Breast + Vaginal comorbid cancer (5000 patients)
+- Mean survival: 37.8 months
+- Death rate: 53.1% | Censoring: 46.9%
+- Features: 25 (demographics, tumor, treatment, comorbidity)
+
+**Model Changes**: None (same architecture, just more input features)
+
+**Data Changes**: 
+- `load_seer_data()` added to handle categorical encoding
+- Column names updated for SEER schema
+
+**Next Steps**:
+1. ✅ Data generated with realistic survival distribution
+2. ✅ Data loader updated for 25 features
+3. ⏳ Full training run (waiting to execute)
+
+---
+
+## 📋 Phase Comparison
+
+| Aspect | Phase 1 (Vanilla) | Phase 2 (SEER) |
+|--------|-------------------|----------------|
+| **Data** | Synthetic linear (10 features) | SEER comorbid (25 features) |
+| **Samples** | 5000 | 5000 (3500 train / 750 val / 750 test) |
+| **Model** | [25, 25] ReLU | [25, 25] ReLU (same) |
+| **Hyperparams** | LR=1e-3, L2=0.01 | LR=1e-3, L2=0.01 (same) |
+| **C-Index** | 0.7111 | ⏳ Pending |
+| **Code Changes** | N/A | Only `data_loader.py` |
 
 ---
 
