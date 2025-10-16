@@ -30,10 +30,10 @@ MODEL_CONFIG = {
 # Training Parameters (Vanilla with PyTorch adjustments)
 TRAINING_CONFIG = {
     'optimizer': 'sgd',
-    'learning_rate': 5e-3,  # Increased for better convergence
+    'learning_rate': 1e-2,  # Higher LR for faster convergence
     'lr_decay': 0.001,
     'momentum': 0.9,
-    'l2_reg': 0.0,  # No regularization - let model learn signal fully
+    'l2_reg': 0.0,  # No regularization
     'l1_reg': 0.0,
     'batch_size': 64,
     'max_epochs': 500,
